@@ -5,262 +5,266 @@ require 'appsignal/demo'
 
 module Appsignal
   class CLI
-    class Install
-      extend CLI::Helpers
+    class Install < Base
+      include CLI::Helpers
 
       EXCLUDED_ENVIRONMENTS = ['test'].freeze
 
-      class << self
-        def run(push_api_key)
+      def self.description
+        "AppSignal installer"
+      end
+
+      def run
+        push_api_key = arguments.first
+
+        puts
+        puts colorize "#######################################", :green
+        puts colorize "## Starting AppSignal Installer      ##", :green
+        puts colorize "## --------------------------------- ##", :green
+        puts colorize "## Need help?  support@appsignal.com ##", :green
+        puts colorize "## Docs?       docs.appsignal.com    ##", :green
+        puts colorize "#######################################", :green
+        puts
+        unless push_api_key
+          puts colorize 'Problem encountered:', :red
+          puts '  No push API key entered.'
+          puts '  - Sign up for AppSignal and follow the instructions'
+          puts "  - Already signed up? Click 'New app' on the account overview page"
           puts
-          puts colorize "#######################################", :green
-          puts colorize "## Starting AppSignal Installer      ##", :green
-          puts colorize "## --------------------------------- ##", :green
-          puts colorize "## Need help?  support@appsignal.com ##", :green
-          puts colorize "## Docs?       docs.appsignal.com    ##", :green
-          puts colorize "#######################################", :green
-          puts
-          unless push_api_key
-            puts colorize 'Problem encountered:', :red
-            puts '  No push API key entered.'
-            puts '  - Sign up for AppSignal and follow the instructions'
-            puts "  - Already signed up? Click 'New app' on the account overview page"
-            puts
-            puts colorize 'Exiting installer...', :red
+          puts colorize 'Exiting installer...', :red
+          return
+        end
+        config = new_config
+        config[:push_api_key] = push_api_key
+
+        print 'Validating API key'
+        periods
+        puts
+        begin
+          auth_check = Appsignal::AuthCheck.new(config)
+          unless auth_check.perform == '200'
+            puts "\n  API key '#{config[:push_api_key]}' is not valid, please get a new one on https://appsignal.com"
             return
           end
-          config = new_config
-          config[:push_api_key] = push_api_key
+        rescue => e
+          puts "  There was an error validating your API key:"
+          puts colorize "'#{e}'", :red
+          puts "  Please try again"
+          return
+        end
+        puts colorize '  API key valid!', :green
+        puts
 
-          print 'Validating API key'
-          periods
+        if installed_frameworks.include?(:rails)
+          install_for_rails(config)
+        elsif installed_frameworks.include?(:padrino)
+          install_for_padrino(config)
+        elsif installed_frameworks.include?(:grape)
+          install_for_grape(config)
+        elsif installed_frameworks.include?(:sinatra)
+          install_for_sinatra(config)
+        else
+          puts "We could not detect which framework you are using. We'd be very grateful if you email us on support@appsignal.com with information about your setup."
+        end
+      end
+
+      def install_for_rails(config)
+        require File.expand_path(File.join(Dir.pwd, 'config/application.rb'))
+
+        puts 'Installing for Ruby on Rails'
+
+        config[:name] = Rails.application.class.parent_name
+
+        name_overwritten = yes_or_no("  Your app's name is: '#{config[:name]}' \n  Do you want to change how this is displayed in AppSignal? (y/n): ")
+        puts
+        if name_overwritten
+          config[:name] = required_input("  Choose app's display name: ")
           puts
+        end
+
+        configure(config, rails_environments, name_overwritten)
+        done_notice
+      end
+
+      def install_for_sinatra(config)
+        puts 'Installing for Sinatra'
+        config[:name] = required_input('  Enter application name: ')
+        puts
+        configure(config, ['development', 'production', 'staging'], true)
+
+        puts "Finish Sinatra configuration"
+        puts "  Sinatra requires some manual configuration."
+        puts "  Add this line beneath require 'sinatra':"
+        puts
+        puts "  require 'appsignal/integrations/sinatra'"
+        puts
+        puts "  You can find more information in the documentation:"
+        puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#sinatra"
+        press_any_key
+        done_notice
+      end
+
+      def install_for_padrino(config)
+        puts 'Installing for Padrino'
+        config[:name] = required_input('  Enter application name: ')
+        puts
+        configure(config, ['development', 'production', 'staging'], true)
+
+        puts "Finish Padrino installation"
+        puts "  Padrino requires some manual configuration."
+        puts "  After installing the gem, add the following line to /config/boot.rb:"
+        puts
+        puts "  require 'appsignal/integrations/padrino"
+        puts
+        puts "  You can find more information in the documentation:"
+        puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#padrino"
+        press_any_key
+        done_notice
+      end
+
+      def install_for_grape(config)
+        puts 'Installing for Grape'
+
+        config[:name] = required_input('  Enter application name: ')
+        puts
+
+        configure(config, ['development', 'production', 'staging'], true)
+
+        puts "Manual Grape configuration needed"
+        puts "  See the installation instructions at:"
+        puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#grape"
+        press_any_key
+        done_notice
+      end
+
+      def install_for_capistrano
+        capfile = File.join(Dir.pwd, 'Capfile')
+        return unless File.exist?(capfile)
+        return if File.read(capfile) =~ %r{require ['|"]appsignal/capistrano}
+
+        puts 'Installing for Capistrano'
+        print '  Adding AppSignal integration to Capfile'
+        File.open(capfile, 'a') do |f|
+          f.write "\nrequire 'appsignal/capistrano'\n"
+        end
+        periods
+        puts
+        puts
+      end
+
+      def configure(config, environments, name_overwritten)
+        install_for_capistrano
+
+        ENV["APPSIGNAL_APP_ENV"] = "development"
+
+        puts "How do you want to configure AppSignal?"
+        puts "  (1) a config file"
+        puts "  (2) environment variables"
+        loop do
+          print "  Choose (1/2): "
+          case ask_for_input
+          when '1'
+            puts
+            print "Writing config file"
+            periods
+            puts
+            puts colorize "  Config file written to config/appsignal.yml", :green
+            write_config_file(
+              :push_api_key => config[:push_api_key],
+              :app_name => config[:name],
+              :environments => environments
+            )
+            puts
+            break
+          when '2'
+            ENV["APPSIGNAL_ACTIVE"] = "true"
+            ENV["APPSIGNAL_PUSH_API_KEY"] = config[:push_api_key]
+            ENV["APPSIGNAL_APP_NAME"] = config[:name]
+
+            puts
+            puts "Add the following environment variables to configure AppSignal:"
+            puts "  export APPSIGNAL_PUSH_API_KEY=#{config[:push_api_key]}"
+            if name_overwritten
+              puts "  export APPSIGNAL_APP_NAME=#{config[:name]}"
+            end
+            puts
+            puts "  See the documentation for more configuration options:"
+            puts "  http://docs.appsignal.com/gem-settings/configuration.html"
+            press_any_key
+            break
+          end
+        end
+      end
+
+      def done_notice
+        sleep 0.3
+        puts colorize "#####################################", :green
+        puts colorize "## AppSignal installation complete ##", :green
+        puts colorize "#####################################", :green
+        sleep 0.3
+        puts
+        if Gem.win_platform?
+          puts 'The AppSignal agent currently does not work on Windows, please push these changes to your test/staging/production environment'
+        else
+          puts "  Sending example data to AppSignal..."
+          if Appsignal::Demo.transmit
+            puts "  Example data sent!"
+            puts "  It may take about a minute for the data to appear on AppSignal.com/accounts"
+            puts
+            puts "  Please return to your browser and follow the instructions."
+          else
+            puts "  Couldn't start the AppSignal agent and send example data to AppSignal.com"
+            puts "  Please use `appsignal diagnose` to debug your configuration."
+          end
+        end
+      end
+
+      def installed_frameworks
+        [].tap do |out|
           begin
-            auth_check = Appsignal::AuthCheck.new(config)
-            unless auth_check.perform == '200'
-              puts "\n  API key '#{config[:push_api_key]}' is not valid, please get a new one on https://appsignal.com"
-              return
-            end
-          rescue => e
-            puts "  There was an error validating your API key:"
-            puts colorize "'#{e}'", :red
-            puts "  Please try again"
-            return
+            require 'rails'
+            out << :rails
+          rescue LoadError
           end
-          puts colorize '  API key valid!', :green
-          puts
-
-          if installed_frameworks.include?(:rails)
-            install_for_rails(config)
-          elsif installed_frameworks.include?(:padrino)
-            install_for_padrino(config)
-          elsif installed_frameworks.include?(:grape)
-            install_for_grape(config)
-          elsif installed_frameworks.include?(:sinatra)
-            install_for_sinatra(config)
-          else
-            puts "We could not detect which framework you are using. We'd be very grateful if you email us on support@appsignal.com with information about your setup."
+          begin
+            require 'sinatra'
+            out << :sinatra
+          rescue LoadError
+          end
+          begin
+            require 'padrino'
+            out << :padrino
+          rescue LoadError
+          end
+          begin
+            require 'grape'
+            out << :grape
+          rescue LoadError
           end
         end
+      end
 
-        def install_for_rails(config)
-          require File.expand_path(File.join(Dir.pwd, 'config/application.rb'))
+      def rails_environments
+        Dir.glob(
+          File.join(Dir.pwd, 'config/environments/*.rb')
+        ).map { |o| File.basename(o, ".rb") }.sort - EXCLUDED_ENVIRONMENTS
+      end
 
-          puts 'Installing for Ruby on Rails'
+      def write_config_file(data)
+        template = ERB.new(
+          File.read(File.join(File.dirname(__FILE__), "../../../resources/appsignal.yml.erb")),
+          nil,
+          '-'
+        )
 
-          config[:name] = Rails.application.class.parent_name
+        config = template.result(OpenStruct.new(data).instance_eval { binding })
 
-          name_overwritten = yes_or_no("  Your app's name is: '#{config[:name]}' \n  Do you want to change how this is displayed in AppSignal? (y/n): ")
-          puts
-          if name_overwritten
-            config[:name] = required_input("  Choose app's display name: ")
-            puts
-          end
+        FileUtils.mkdir_p(File.join(Dir.pwd, 'config'))
+        File.write(File.join(Dir.pwd, 'config/appsignal.yml'), config)
+      end
 
-          configure(config, rails_environments, name_overwritten)
-          done_notice
-        end
-
-        def install_for_sinatra(config)
-          puts 'Installing for Sinatra'
-          config[:name] = required_input('  Enter application name: ')
-          puts
-          configure(config, ['development', 'production', 'staging'], true)
-
-          puts "Finish Sinatra configuration"
-          puts "  Sinatra requires some manual configuration."
-          puts "  Add this line beneath require 'sinatra':"
-          puts
-          puts "  require 'appsignal/integrations/sinatra'"
-          puts
-          puts "  You can find more information in the documentation:"
-          puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#sinatra"
-          press_any_key
-          done_notice
-        end
-
-        def install_for_padrino(config)
-          puts 'Installing for Padrino'
-          config[:name] = required_input('  Enter application name: ')
-          puts
-          configure(config, ['development', 'production', 'staging'], true)
-
-          puts "Finish Padrino installation"
-          puts "  Padrino requires some manual configuration."
-          puts "  After installing the gem, add the following line to /config/boot.rb:"
-          puts
-          puts "  require 'appsignal/integrations/padrino"
-          puts
-          puts "  You can find more information in the documentation:"
-          puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#padrino"
-          press_any_key
-          done_notice
-        end
-
-        def install_for_grape(config)
-          puts 'Installing for Grape'
-
-          config[:name] = required_input('  Enter application name: ')
-          puts
-
-          configure(config, ['development', 'production', 'staging'], true)
-
-          puts "Manual Grape configuration needed"
-          puts "  See the installation instructions at:"
-          puts "  http://docs.appsignal.com/getting-started/supported-frameworks.html#grape"
-          press_any_key
-          done_notice
-        end
-
-        def install_for_capistrano
-          capfile = File.join(Dir.pwd, 'Capfile')
-          return unless File.exist?(capfile)
-          return if File.read(capfile) =~ %r{require ['|"]appsignal/capistrano}
-
-          puts 'Installing for Capistrano'
-          print '  Adding AppSignal integration to Capfile'
-          File.open(capfile, 'a') do |f|
-            f.write "\nrequire 'appsignal/capistrano'\n"
-          end
-          periods
-          puts
-          puts
-        end
-
-        def configure(config, environments, name_overwritten)
-          install_for_capistrano
-
-          ENV["APPSIGNAL_APP_ENV"] = "development"
-
-          puts "How do you want to configure AppSignal?"
-          puts "  (1) a config file"
-          puts "  (2) environment variables"
-          loop do
-            print "  Choose (1/2): "
-            case ask_for_input
-            when '1'
-              puts
-              print "Writing config file"
-              periods
-              puts
-              puts colorize "  Config file written to config/appsignal.yml", :green
-              write_config_file(
-                :push_api_key => config[:push_api_key],
-                :app_name => config[:name],
-                :environments => environments
-              )
-              puts
-              break
-            when '2'
-              ENV["APPSIGNAL_ACTIVE"] = "true"
-              ENV["APPSIGNAL_PUSH_API_KEY"] = config[:push_api_key]
-              ENV["APPSIGNAL_APP_NAME"] = config[:name]
-
-              puts
-              puts "Add the following environment variables to configure AppSignal:"
-              puts "  export APPSIGNAL_PUSH_API_KEY=#{config[:push_api_key]}"
-              if name_overwritten
-                puts "  export APPSIGNAL_APP_NAME=#{config[:name]}"
-              end
-              puts
-              puts "  See the documentation for more configuration options:"
-              puts "  http://docs.appsignal.com/gem-settings/configuration.html"
-              press_any_key
-              break
-            end
-          end
-        end
-
-        def done_notice
-          sleep 0.3
-          puts colorize "#####################################", :green
-          puts colorize "## AppSignal installation complete ##", :green
-          puts colorize "#####################################", :green
-          sleep 0.3
-          puts
-          if Gem.win_platform?
-            puts 'The AppSignal agent currently does not work on Windows, please push these changes to your test/staging/production environment'
-          else
-            puts "  Sending example data to AppSignal..."
-            if Appsignal::Demo.transmit
-              puts "  Example data sent!"
-              puts "  It may take about a minute for the data to appear on AppSignal.com/accounts"
-              puts
-              puts "  Please return to your browser and follow the instructions."
-            else
-              puts "  Couldn't start the AppSignal agent and send example data to AppSignal.com"
-              puts "  Please use `appsignal diagnose` to debug your configuration."
-            end
-          end
-        end
-
-        def installed_frameworks
-          [].tap do |out|
-            begin
-              require 'rails'
-              out << :rails
-            rescue LoadError
-            end
-            begin
-              require 'sinatra'
-              out << :sinatra
-            rescue LoadError
-            end
-            begin
-              require 'padrino'
-              out << :padrino
-            rescue LoadError
-            end
-            begin
-              require 'grape'
-              out << :grape
-            rescue LoadError
-            end
-          end
-        end
-
-        def rails_environments
-          Dir.glob(
-            File.join(Dir.pwd, 'config/environments/*.rb')
-          ).map { |o| File.basename(o, ".rb") }.sort - EXCLUDED_ENVIRONMENTS
-        end
-
-        def write_config_file(data)
-          template = ERB.new(
-            File.read(File.join(File.dirname(__FILE__), "../../../resources/appsignal.yml.erb")),
-            nil,
-            '-'
-          )
-
-          config = template.result(OpenStruct.new(data).instance_eval { binding })
-
-          FileUtils.mkdir_p(File.join(Dir.pwd, 'config'))
-          File.write(File.join(Dir.pwd, 'config/appsignal.yml'), config)
-        end
-
-        def new_config
-          Appsignal::Config.new(Dir.pwd, "")
-        end
+      def new_config
+        Appsignal::Config.new(Dir.pwd, "")
       end
     end
   end

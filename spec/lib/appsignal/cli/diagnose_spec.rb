@@ -1,10 +1,11 @@
 require "appsignal/cli"
 
 describe Appsignal::CLI::Diagnose, :api_stub => true do
-  describe ".run" do
+  include CLIHelpers
+
+  describe "#run" do
     let(:out_stream) { StringIO.new }
     let(:config) { project_fixture_config }
-    let(:cli) { described_class }
     let(:output) { out_stream.string }
     let(:options) { { :environment => config.env } }
 
@@ -25,7 +26,7 @@ describe Appsignal::CLI::Diagnose, :api_stub => true do
 
     def run_within_dir(chdir)
       Dir.chdir chdir do
-        cli.run(options)
+        run_cli("diagnose", options)
       end
     end
 
@@ -406,7 +407,7 @@ describe Appsignal::CLI::Diagnose, :api_stub => true do
         let(:ext_path) { File.join(gem_path, "ext") }
         let(:log_path) { File.join(ext_path, log_file) }
         before do
-          allow(cli).to receive(:gem_path).and_return(gem_path)
+          allow_any_instance_of(described_class).to receive(:gem_path).and_return(gem_path)
         end
 
         context "when file exists" do

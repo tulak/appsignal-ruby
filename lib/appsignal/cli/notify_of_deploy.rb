@@ -1,54 +1,69 @@
 module Appsignal
   class CLI
-    class NotifyOfDeploy
-      class << self
-        def run(options)
-          config = config_for(options[:environment])
-          config[:name] = options[:name] if options[:name]
+    class NotifyOfDeploy < CLI::Base
+      def self.description
+        "Notify AppSignal of a deploy, creating a marker in the AppSignal UI."
+      end
 
-          validate_active_config(config)
-          required_config = [:revision, :user]
-          required_config << :environment if config.env.empty?
-          required_config << :name if !config[:name] || config[:name].empty?
-          validate_required_options(options, required_config)
+      def self.options(opts = {})
+        OptionParser.new do |o|
+          o.banner = 'Usage: appsignal notify_of_deploy [options]'
 
-          Appsignal::Marker.new(
-            {
-              :revision => options[:revision],
-              :user => options[:user]
-            },
-            config
-          ).transmit
-        end
-
-        private
-
-        def validate_required_options(options, required_options)
-          missing = required_options.select do |required_option|
-            val = options[required_option]
-            val.nil? || (val.respond_to?(:empty?) && val.empty?)
+          o.on '--revision=<revision>', "The revision you're deploying" do |arg|
+            opts[:revision] = arg
           end
-          return unless missing.any?
 
-          puts "Error: Missing options: #{missing.join(', ')}"
-          exit 1
+          o.on '--user=<user>', "The name of the user that's deploying" do |arg|
+            opts[:user] = arg
+          end
+
+          o.on '--environment=<rails_env>', "The environment you're deploying to" do |arg|
+            opts[:environment] = arg
+          end
+
+          o.on '--name=<name>', "The name of the app (optional)" do |arg|
+            opts[:name] = arg
+          end
         end
+      end
 
-        def validate_active_config(config)
-          return if config.active?
+      def run
+        config = config_for(options[:environment])
+        config[:name] = options[:name] if options[:name]
 
-          puts "Error: No valid config found."
-          exit 1
+        validate_active_config(config)
+        required_config = [:revision, :user]
+        required_config << :environment if config.env.empty?
+        required_config << :name if !config[:name] || config[:name].empty?
+        validate_required_options(options, required_config)
+
+        Appsignal::Marker.new(
+          {
+            :revision => options[:revision],
+            :user => options[:user]
+          },
+          config
+        ).transmit
+      end
+
+      private
+
+      def validate_active_config(config)
+        return if config.active?
+
+        puts "Error: No valid config found."
+        exit 1
+      end
+
+      def validate_required_options(options, required_options)
+        missing = required_options.select do |required_option|
+          val = options[required_option]
+          val.nil? || (val.respond_to?(:empty?) && val.empty?)
         end
+        return if missing.empty?
 
-        def config_for(environment)
-          Appsignal::Config.new(
-            Dir.pwd,
-            environment,
-            {},
-            Logger.new(StringIO.new)
-          )
-        end
+        puts "Error: Missing options: #{missing.join(', ')}"
+        exit 1
       end
     end
   end

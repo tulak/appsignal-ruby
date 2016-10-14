@@ -1,54 +1,46 @@
-require 'appsignal/cli'
+require "appsignal/cli"
 
 describe Appsignal::CLI do
   let(:out_stream) { StringIO.new }
+  let(:output) { out_stream.string }
   let(:cli) { Appsignal::CLI }
-  before do
-    Dir.stub(:pwd => project_fixture_path)
-  end
   around do |example|
-    capture_stdout(out_stream) { example.run }
-  end
-
-  it "should print the help with no arguments, -h and --help" do
-    [nil, '-h', '--help'].each do |arg|
-      lambda {
-        cli.run([arg].compact)
-      }.should raise_error(SystemExit)
-
-      out_stream.string.should include 'appsignal <command> [options]'
-      out_stream.string.should include \
-        'Available commands: demo, diagnose, install, notify_of_deploy'
+    Dir.chdir(project_fixture_path) do
+      capture_stdout(out_stream) { example.run }
     end
   end
 
-  it "should print the version with -v and --version" do
-    ['-v', '--version'].each do |arg|
-      lambda {
-        cli.run([arg])
-      }.should raise_error(SystemExit)
+  it "prints the help with no arguments, -h and --help" do
+    [nil, "-h", "--help"].each do |arg|
+      expect do
+        cli.run([nil, arg])
+      end.to raise_error(SystemExit)
 
-      out_stream.string.should include 'AppSignal'
-      out_stream.string.should include '.'
+      expect(output).to include "appsignal <command> [options]"
+      commands = described_class::COMMANDS.keys.map { |k| "\n  #{k}" }
+
+      expect(output).to include(*commands)
     end
   end
 
-  it "should print a notice if a command does not exist" do
-    lambda {
-        cli.run(['nonsense'])
-      }.should raise_error(SystemExit)
+  it "prints the version with -v and --version" do
+    ["-v", "--version"].each do |arg|
+      expect do
+        cli.run([nil, arg])
+      end.to raise_error(SystemExit)
 
-    out_stream.string.should include "Command 'nonsense' does not exist, run "\
-      "appsignal -h to see the help"
+      expect(output).to include "AppSignal #{Appsignal::VERSION}"
+    end
   end
 
-  describe "diagnose" do
-    it "should call Appsignal::Diagnose.install" do
-      Appsignal::CLI::Diagnose.should_receive(:run)
+  context "when a command does not exist" do
+    it "prints a notice that the command does not exist" do
+      expect do
+        cli.run(["nonsense"])
+      end.to raise_error(SystemExit)
 
-      cli.run([
-        'diagnose'
-      ])
+      expect(output).to include "Command 'nonsense' does not exist, run "\
+        "appsignal --help to see the help"
     end
   end
 end
