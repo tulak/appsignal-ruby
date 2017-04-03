@@ -1,6 +1,8 @@
 module Appsignal
   class Hooks
     class ShoryukenMiddleware
+      EXCLUDE_KEYS = %w(job_class queue_name arguments).freeze
+
       def call(_worker_instance, queue, sqs_msg, body)
         metadata = {
           :queue => queue
@@ -11,10 +13,10 @@ module Appsignal
           :metadata => metadata
         }
 
-        if body.respond_to?(:reject)
-          exclude_keys = [:job_class, :queue_name, :arguments]
-          metadata.merge!(body.reject { |key| exclude_keys.member?(key.to_sym) })
-          options[:class] = body["job_class"] # can it be a symbol? Shoryuken allows custom serialization
+        if body.is_a?(Hash)
+          body = body.each_with_object({}) { |(key, value), object| object[key.to_s] = value }
+          metadata.merge!(body.reject { |key, _value| EXCLUDE_KEYS.member?(key) })
+          options[:class] = body["job_class"]
           options[:params] = body["arguments"] if body.key?("arguments")
         else
           metadata[:body] = body
