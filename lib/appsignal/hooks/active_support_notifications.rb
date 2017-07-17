@@ -37,6 +37,7 @@ module Appsignal
           ensure
             if instrument_this
               title, body, body_format = Appsignal::EventFormatter.format(name, payload)
+              Appsignal.logger.debug("instrument: #{[name, title, body, body_format].inspect}")
               transaction.finish_event(
                 name,
                 title,
