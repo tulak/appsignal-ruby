@@ -27,15 +27,34 @@ module Appsignal
           :params_method => :filtered_parameters
         )
         begin
+          puts "rails"
           @app.call(env)
         rescue => error
+          puts "rails error"
           transaction.set_error(error)
           raise error
         ensure
+          puts "rails ensure"
           controller = env["action_controller.instance"]
           if controller
             transaction.set_action_if_nil("#{controller.class}##{controller.action_name}")
           end
+
+          endpoint = env["api.endpoint"]
+          if endpoint && endpoint.options
+            options = endpoint.options
+            request_method = options[:method].first.to_s.upcase
+            klass = options[:for]
+            namespace = endpoint.namespace
+            namespace = "" if namespace == "/"
+
+            path = options[:path].first.to_s
+            path = "/#{path}" if path[0] != "/"
+            path = "#{namespace}#{path}"
+
+            transaction.set_action_if_nil("#{request_method}::#{klass}##{path}")
+          end
+
           transaction.set_http_or_background_queue_start
           transaction.set_metadata("path", request.path)
           transaction.set_metadata("method", request.request_method)

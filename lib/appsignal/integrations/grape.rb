@@ -19,11 +19,14 @@ module Appsignal
           request
         )
         begin
+          puts "grape"
           app.call(env)
         rescue => error
+          puts "grape error"
           transaction.set_error(error)
           raise error
         ensure
+          puts "grape ensure"
           request_method = request.request_method.to_s.upcase
           path = request.path # Path without namespaces
           endpoint = env["api.endpoint"]
