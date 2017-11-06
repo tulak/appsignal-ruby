@@ -1,5 +1,7 @@
 if DependencyHelper.sidekiq_present?
   describe Appsignal::Hooks::SidekiqPlugin do
+    class DelayedTestClass; end
+
     let(:namespace) { Appsignal::Transaction::BACKGROUND_JOB }
     let(:worker) { anything }
     let(:queue) { anything }
@@ -161,9 +163,6 @@ if DependencyHelper.sidekiq_present?
             "enqueued_at" => Time.parse("2001-01-01 10:00:00UTC").to_f,
             "extra" => "data"
           }
-        end
-        before do
-          class DelayedTestClass; end
         end
 
         it "uses the delayed class and method name for the action" do
