@@ -4,6 +4,7 @@ module Appsignal
     class SidekiqPlugin
       include Appsignal::Hooks::Helpers
 
+      # TODO: Make constant
       def job_keys
         @job_keys ||= Set.new(%w(
           class args retried_at failed_at
@@ -14,21 +15,14 @@ module Appsignal
       end
 
       def call(_worker, item, _queue)
-        job = fetch_sidekiq_job { ::Sidekiq::Job.new(item) }
-        job_metadata = call_and_log_on_error(job, &:item)
-
-        job_action_name = parse_action_name(job)
-        params = Appsignal::Utils::ParamsSanitizer.sanitize(
-          call_and_log_on_error(job, &:display_args),
-          :filter_parameters => Appsignal.config[:filter_parameters]
-        )
+        action_name = formatted_action_name(item)
+        params = filtered_arguments(item)
 
         transaction = Appsignal::Transaction.create(
           SecureRandom.uuid,
           Appsignal::Transaction::BACKGROUND_JOB,
           Appsignal::Transaction::GenericRequest.new(
-            :queue_start => call_and_log_on_error(job, &:enqueued_at),
-            :queue_time  => call_and_log_on_error(job) { |j| j.latency.to_f * 1000 }
+            :queue_start => item["enqueued_at"]
           )
         )
 
@@ -42,9 +36,9 @@ module Appsignal
         end
       ensure
         if transaction
-          transaction.set_action_if_nil(job_action_name)
+          transaction.set_action_if_nil(action_name)
           transaction.params = params
-          formatted_metadata(job_metadata).each do |key, value|
+          formatted_metadata(item).each do |key, value|
             transaction.set_metadata key, value
           end
           transaction.set_http_or_background_queue_start
@@ -54,31 +48,75 @@ module Appsignal
 
       private
 
-      def fetch_sidekiq_job
-        yield
-      rescue NameError => e
-        Appsignal.logger.error("Problem parsing the Sidekiq job data: #{e.inspect}")
-        nil
+      def formatted_action_name(job)
+        sidekiq_action_name = parse_action_name(job)
+        return sidekiq_action_name if sidekiq_action_name =~ /\.|#/
+        "#{sidekiq_action_name}#perform"
       end
 
-      def call_and_log_on_error(job)
-        yield job if job
-      rescue NameError => e
-        Appsignal.logger.error("Problem parsing the Sidekiq job data: #{e.inspect}")
-        nil
-      end
-
+      # Based on: https://github.com/mperham/sidekiq/blob/63ee43353bd3b753beb0233f64865e658abeb1c3/lib/sidekiq/api.rb#L316-L334
       def parse_action_name(job)
-        # `job.display_class` needs to be called before `job.display_args`,
-        # see https://github.com/appsignal/appsignal-ruby/pull/348#issuecomment-333629065
-        action_name = call_and_log_on_error(job, &:display_class)
-        if action_name =~ /[\.#]+/
-          action_name
+        case job["class"]
+        when /\ASidekiq::Extensions::Delayed/
+          safe_load(job["args"][0], job["class"]) do |target, method, _|
+            "#{target}.#{method}"
+          end
+        when "ActiveJob::QueueAdapters::SidekiqAdapter::JobWrapper"
+          job_class = job["wrapped"] || args[0]
+          if "ActionMailer::DeliveryJob" == job_class
+            # MailerClass#mailer_method
+            args[0]["arguments"][0..1].join("#")
+          else
+            job_class
+          end
         else
-          # Add `#perform` as default method name for job names without a
-          # method name
-          "#{action_name}#perform"
+          job["class"]
         end
+      end
+
+      def filtered_arguments(job)
+        Appsignal::Utils::ParamsSanitizer.sanitize(
+          parse_arguments(job),
+          :filter_parameters => Appsignal.config[:filter_parameters]
+        )
+      end
+
+      # Based on: https://github.com/mperham/sidekiq/blob/63ee43353bd3b753beb0233f64865e658abeb1c3/lib/sidekiq/api.rb#L336-L358
+      def parse_arguments(job)
+        args = job["args"]
+        case job["class"]
+        when /\ASidekiq::Extensions::Delayed/
+          safe_load(args[0], args) do |_, _, arg|
+            arg
+          end
+        when "ActiveJob::QueueAdapters::SidekiqAdapter::JobWrapper"
+          is_wrapped = job["wrapped"]
+          job_args = is_wrapped ? job["args"][0]["arguments"] : []
+          if "ActionMailer::DeliveryJob" == (is_wrapped || args[0])
+            # Remove MailerClass, mailer_method and "deliver_now"
+            job_args.drop(3)
+          else
+            job_args
+          end
+        else
+          # TODO: Keep?
+          # if self["encrypt".freeze]
+          #   # no point in showing 150+ bytes of random garbage
+          #   args[-1] = "[encrypted data]".freeze
+          # end
+          args
+        end
+      end
+
+      # Source: https://github.com/mperham/sidekiq/blob/63ee43353bd3b753beb0233f64865e658abeb1c3/lib/sidekiq/api.rb#L403-L412
+      def safe_load(content, default)
+        yield(*YAML.load(content))
+      rescue => error
+        # Sidekiq issue #1761: in dev mode, it's possible to have jobs enqueued
+        # which haven't been loaded into memory yet so the YAML can't be
+        # loaded.
+        Appsignal.logger.warn "Unable to load YAML: #{error.message}"
+        default
       end
 
       def formatted_metadata(item)
@@ -99,7 +137,6 @@ module Appsignal
       end
 
       def install
-        require "sidekiq/api"
         ::Sidekiq.configure_server do |config|
           config.server_middleware do |chain|
             chain.add Appsignal::Hooks::SidekiqPlugin
