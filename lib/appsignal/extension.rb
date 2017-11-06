@@ -1,5 +1,3 @@
-require "yaml"
-
 begin
   require "appsignal_extension"
   Appsignal.extension_loaded = true

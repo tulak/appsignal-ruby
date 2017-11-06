@@ -1,5 +1,4 @@
 require "erb"
-require "yaml"
 require "uri"
 require "socket"
 require "tmpdir"
