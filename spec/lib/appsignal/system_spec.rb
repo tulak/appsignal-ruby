@@ -55,12 +55,11 @@ describe Appsignal::System do
   end
 
   describe ".agent_platform" do
-    let(:os) { "linux-gnu" }
+    let(:os) { "linux" }
     let(:ldd_output) { "" }
     before do
       allow(described_class).to receive(:ldd_version_output).and_return(ldd_output)
-      allow(RbConfig::CONFIG).to receive(:[])
-      allow(RbConfig::CONFIG).to receive(:[]).with("host_os").and_return(os)
+      allow(Gem::Platform.local).to receive(:os).and_return(os)
     end
     subject { described_class.agent_platform }
 
@@ -111,7 +110,7 @@ describe Appsignal::System do
     end
 
     context "when on macOS" do
-      let(:os) { "darwin16.7.0" }
+      let(:os) { "darwin" }
       let(:ldd_output) { "ldd: command not found" }
 
       it "returns the darwin build" do
@@ -120,7 +119,7 @@ describe Appsignal::System do
     end
 
     context "when on FreeBSD" do
-      let(:os) { "freebsd11" }
+      let(:os) { "freebsd" }
       let(:ldd_output) { "ldd: illegal option -- -" }
 
       it "returns the darwin build" do

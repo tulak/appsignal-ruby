@@ -1,17 +1,12 @@
 require "yaml"
 
 begin
-  if Appsignal::System.jruby?
-    require "appsignal/extension/jruby"
-    # {Appsignal.extension_loaded} is set in the jRuby extension file
-  else
-    require "appsignal_extension"
-    Appsignal.extension_loaded = true
-  end
+  require "appsignal_extension"
+  Appsignal.extension_loaded = true
 rescue LoadError => err
   Appsignal.logger.error(
     "Failed to load extension (#{err}), please check the install.log file in " \
-    "the ext directory of the gem and email us at support@appsignal.com"
+    "the ext directory of the gem and e-mail us at support@appsignal.com"
   )
   Appsignal.extension_loaded = false
 end
@@ -30,28 +25,9 @@ module Appsignal
         agent_config["version"]
       end
 
-      # Do nothing if the extension methods are not loaded
-      #
-      # Disabled in testing so we can make sure that we don't miss a extension
-      # function implementation.
       def method_missing(m, *args, &block)
-        super if Appsignal.testing?
+        # Do nothing if the extension methods are not loaded
       end
-    end
-
-    if Appsignal::System.jruby?
-      extend Appsignal::Extension::Jruby
-
-      # Reassign Transaction class for jRuby extension usage.
-      #
-      # Makes sure the generated docs aren't always overwritten with the jRuby
-      # version.
-      Transaction = Jruby::Transaction
-      # Reassign Data class for jRuby extension usage.
-      #
-      # Makes sure the generated docs aren't always overwritten with the jRuby
-      # version.
-      Data = Jruby::Data
     end
 
     class Data

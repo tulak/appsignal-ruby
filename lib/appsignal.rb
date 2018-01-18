@@ -63,11 +63,6 @@ module Appsignal
       end
     end
 
-    # @api private
-    def testing?
-      false
-    end
-
     # Start the AppSignal integration.
     #
     # Starts AppSignal with the given configuration. If no configuration is set
@@ -93,7 +88,7 @@ module Appsignal
     #
     # @return [void]
     # @since 0.7.0
-    def start # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def start
       unless extension_loaded?
         logger.info("Not starting appsignal, extension is not loaded")
         return
@@ -124,7 +119,7 @@ module Appsignal
           Appsignal::EventFormatter.initialize_formatters
           initialize_extensions
 
-          if config[:enable_allocation_tracking] && !Appsignal::System.jruby?
+          if config[:enable_allocation_tracking]
             Appsignal::Extension.install_allocation_event_hook
           end
 
@@ -703,7 +698,7 @@ module Appsignal
     # @see Extension
     # @since 1.0.0
     def extension_loaded?
-      !!extension_loaded
+      !!@extension_loaded
     end
 
     # Returns the active state of the AppSignal integration.
@@ -783,7 +778,6 @@ module Appsignal
   end
 end
 
-require "appsignal/system"
 require "appsignal/utils"
 require "appsignal/extension"
 require "appsignal/auth_check"
@@ -802,3 +796,4 @@ require "appsignal/rack/generic_instrumentation"
 require "appsignal/rack/js_exception_catcher"
 require "appsignal/js_exception_transaction"
 require "appsignal/transmitter"
+require "appsignal/system"

@@ -54,10 +54,6 @@ Style/MethodMissing:
 Style/TrailingUnderscoreVariable:
   Enabled: false
 
-Style/FileName:
-  Exclude:
-    - "ext/Rakefile"
-
 Metrics/BlockLength:
   Exclude:
     - "Rakefile"

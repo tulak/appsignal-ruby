@@ -119,9 +119,11 @@ describe Appsignal::Extension do
   context "when the extension library cannot be loaded" do
     subject { Appsignal::Extension }
 
-    before do
-      allow(Appsignal).to receive(:extension_loaded).and_return(false)
-      allow(Appsignal).to receive(:testing?).and_return(false)
+    before :context do
+      Appsignal.extension_loaded = false
+    end
+    after :context do
+      Appsignal.extension_loaded = true
     end
 
     it "should indicate that the extension is not loaded" do
