@@ -187,7 +187,8 @@ if DependencyHelper.sinatra_present?
       end
 
       it "should set metadata" do
-        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).twice
+        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).with("path", "")
+        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).with("method", nil)
       end
 
       it "should set the queue start" do

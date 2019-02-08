@@ -82,7 +82,8 @@ if DependencyHelper.rails_present?
       end
 
       it "should set metadata" do
-        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).twice
+        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).with("path", "/blog")
+        expect_any_instance_of(Appsignal::Transaction).to receive(:set_metadata).with("method", "GET")
       end
 
       it "should set the action and queue start" do
