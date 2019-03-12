@@ -8,7 +8,7 @@ require File.expand_path("../../lib/appsignal/version.rb", __FILE__)
 require File.expand_path("../../lib/appsignal/system.rb", __FILE__)
 
 EXT_PATH     = File.expand_path("..", __FILE__).freeze
-AGENT_CONFIG = YAML.load(File.read(File.join(EXT_PATH, "agent.yml"))).freeze
+AGENT_CONFIG = YAML.load(File.read(File.join(EXT_PATH, "agent.yml"))).freeze # rubocop:disable Security/YAMLLoad
 
 AGENT_PLATFORM = Appsignal::System.agent_platform
 ARCH = "#{RbConfig::CONFIG["host_cpu"]}-#{AGENT_PLATFORM}".freeze

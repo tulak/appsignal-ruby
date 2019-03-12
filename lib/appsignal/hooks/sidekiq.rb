@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "yaml"
-
 module Appsignal
   class Hooks
     class SidekiqHook < Appsignal::Hooks::Hook
@@ -325,7 +323,7 @@ module Appsignal
 
       # Based on: https://github.com/mperham/sidekiq/blob/63ee43353bd3b753beb0233f64865e658abeb1c3/lib/sidekiq/api.rb#L403-L412
       def safe_load(content, default)
-        yield(*YAML.load(content))
+        yield(*Appsignal::Utils::YAML.safe_load(content))
       rescue => error
         # Sidekiq issue #1761: in dev mode, it's possible to have jobs enqueued
         # which haven't been loaded into memory yet so the YAML can't be

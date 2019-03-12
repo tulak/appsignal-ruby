@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "erb"
-require "yaml"
 require "uri"
 require "socket"
 require "tmpdir"
@@ -261,7 +260,8 @@ module Appsignal
     def load_from_disk
       return if !config_file || !File.exist?(config_file)
 
-      configurations = YAML.load(ERB.new(IO.read(config_file)).result)
+      contents = ERB.new(IO.read(config_file)).result
+      configurations = Appsignal::Utils::YAML.safe_load(contents)
       config_for_this_env = configurations[env]
       if config_for_this_env
         config_for_this_env =
