@@ -962,3 +962,17 @@ blocks:
         value: latest
       commands:
       - "./support/bundler_wrapper exec rake test"
+    - name: Ruby jruby-9.1.17.0 for rails-6.0
+      env_vars:
+      - name: RUBY_VERSION
+        value: jruby-9.1.17.0
+      - name: GEMSET
+        value: rails-6.0
+      - name: BUNDLE_GEMFILE
+        value: gemfiles/rails-6.0.gemfile
+      - name: _RUBYGEMS_VERSION
+        value: latest
+      - name: _BUNDLER_VERSION
+        value: latest
+      commands:
+      - "./support/bundler_wrapper exec rake test"

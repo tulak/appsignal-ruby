@@ -157,7 +157,6 @@ matrix:
           - "2.2.10"
           - "2.3.8"
           - "2.4.9"
-          - "jruby-9.1.17.0"
     - gem: "resque"
       bundler: "1.17.3"
     - gem: "sequel"
