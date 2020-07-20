@@ -15,7 +15,7 @@ rescue LoadError => error
     "Please run `appsignal diagnose` and email us at support@appsignal.com \n" \
     "#{error.class}: #{error.message}"
   Appsignal.logger.error(error_message)
-  $stderr.puts error_message
+  warn error_message
   Appsignal.extension_loaded = false
 end
 

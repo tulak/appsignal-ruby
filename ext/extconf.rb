@@ -7,6 +7,10 @@ def local_build?
 end
 
 def install
+  if ENV["_TEST_APPSIGNAL_EXTENSION_FAILURE"]
+    raise "AppSignal internal test failure"
+  end
+
   library_type = "static"
   report["language"]["implementation"] = "ruby"
   report["build"]["library_type"] = library_type

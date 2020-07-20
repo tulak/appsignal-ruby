@@ -56,7 +56,7 @@ module Appsignal
 
   class Extension
     class Transaction
-      alias original_finish finish
+      alias original_finish finish if respond_to? :finish
 
       # Override default {Extension::Transaction#finish} behavior to always
       # return true, which tells the transaction to add its sample data (unless
@@ -72,7 +72,7 @@ module Appsignal
         return_value
       end
 
-      alias original_complete complete
+      alias original_complete complete if respond_to? :complete
 
       # Override default {Extension::Transaction#complete} behavior to
       # store the transaction JSON before the transaction is completed
