@@ -32,17 +32,18 @@ semaphore: # Default `.semaphore/semaphore.yml` contents
     prologue:
       commands:
         - checkout
+        - rm -f $HOME/.rbenv/plugins/rbenv-gem-rehash/etc/rbenv.d/exec/~gem-rehash.bash
         - sem-version ruby $RUBY_VERSION
         - ./support/check_versions
         - cache restore $_BUNDLER_CACHE-bundler-$RUBY_VERSION-$GEMSET-$(checksum $BUNDLE_GEMFILE)
         - cache restore $_GEMS_CACHE-gems-$RUBY_VERSION-$(checksum $BUNDLE_GEMFILE)
         - ./support/install_deps
         - bundle config set clean 'true'
-        - ./support/bundler_wrapper install --jobs=3 --retry=3 --path vendor/bundle
+        - ./support/bundler_wrapper install --jobs=3 --retry=3 --path=$(pwd)/vendor/bundle
     epilogue:
       on_pass:
         commands:
-          - cache store $_BUNDLER_CACHE-bundler-$RUBY_VERSION-$GEMSET-$(checksum $BUNDLE_GEMFILE) vendor/bundle
+          - cache store $_BUNDLER_CACHE-bundler-$RUBY_VERSION-$GEMSET-$(checksum $BUNDLE_GEMFILE) $(pwd)/vendor/bundle
           - cache store $_GEMS_CACHE-gems-$RUBY_VERSION-$(checksum $BUNDLE_GEMFILE) $HOME/.gem
       on_fail:
         commands:
