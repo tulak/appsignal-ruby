@@ -332,6 +332,7 @@ module Appsignal
           puts "AppSignal library"
           data_section :library do
             save :language, "ruby"
+            puts_value "Language", "Ruby"
             puts_and_save :package_version, "Gem version", Appsignal::VERSION
             puts_and_save :agent_version, "Agent version", Appsignal::Extension.agent_version
             save :extension_loaded, Appsignal.extension_loaded
