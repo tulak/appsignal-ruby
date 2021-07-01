@@ -119,7 +119,7 @@ matrix:
     - ruby: "2.6.6"
     - ruby: "2.7.3"
     - ruby: "3.0.1"
-    - ruby: "jruby-9.1.17.0"
+    - ruby: "jruby-9.2.11.1"
       gems: "minimal"
   gems:
     - gem: "no_dependencies"
@@ -162,7 +162,7 @@ matrix:
           - "2.2.10"
           - "2.3.8"
           - "2.4.10"
-          - "jruby-9.1.17.0"
+          - "jruby-9.2.11.1"
     - gem: "resque-1"
       bundler: "1.17.3"
       exclude:
