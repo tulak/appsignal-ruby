@@ -178,7 +178,8 @@ describe Appsignal::Config do
         :files_world_accessible         => true,
         :transaction_debug_mode         => false,
         :revision                       => "v2.5.1",
-        :request_headers                => []
+        :request_headers                => [],
+        :enable_service_fingerprints    => false,
       )
     end
 
